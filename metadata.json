@@ -1,0 +1,5 @@
+{
+  "name": "StudyBuddy",
+  "description": "A pink-themed study companion that generates exams and flashcards from your notes using AI.",
+  "requestFramePermissions": []
+}
