@@ -29,10 +29,6 @@ import { cn } from './lib/utils';
 import { StudyData, StudyDataSchema } from './types';
 import ReactMarkdown from 'react-markdown';
 
-import { auth, googleProvider, signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged, User as FirebaseUser } from './firebase';
-import { db } from './firebase';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { getRedirectResult } from 'firebase/auth';
 import { ThinkingLevel } from "@google/genai";
 
 const MAX_PHOTOS = 20;
@@ -170,8 +166,6 @@ export default function App() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [studyData, setStudyData] = useState<StudyData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
   const [activeTab, setActiveTab] = useState<'explanation' | 'flashcards' | 'exam'>('explanation');
   const [isSimple, setIsSimple] = useState(false);
   const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
@@ -204,58 +198,6 @@ export default function App() {
   }, [step, loadingMessages.length]);
 
   const t = translations[lang];
-
-  React.useEffect(() => {
-    const checkRedirect = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result?.user) {
-          setUser(result.user as FirebaseUser);
-        }
-      } catch (err: any) {
-        console.error("Redirect Result Error:", err);
-        setError(err.message);
-      }
-    };
-    checkRedirect();
-
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u as FirebaseUser);
-      setIsAuthReady(true);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const handleLogin = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (err: any) {
-      console.error("Login Error:", err);
-      if (err.code === 'auth/popup-blocked') {
-        setError(t.popupBlocked);
-      } else {
-        setError(err.message);
-      }
-    }
-  };
-
-  const handleLoginRedirect = async () => {
-    try {
-      await signInWithRedirect(auth, googleProvider);
-    } catch (err: any) {
-      console.error("Redirect Login Error:", err);
-      setError(err.message);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      setStep('welcome');
-    } catch (err: any) {
-      console.error("Logout Error:", err);
-    }
-  };
 
   const compressImage = (base64Str: string): Promise<string> => {
     return new Promise((resolve) => {
@@ -468,70 +410,26 @@ export default function App() {
               </div>
 
               <div className="flex flex-col gap-4">
-                {!user ? (
-                  <div className="space-y-4">
-                    <button
-                      onClick={handleLogin}
-                      className="w-full bg-white border-2 border-gray-200 text-gray-700 py-4 px-8 rounded-2xl font-bold text-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-3"
-                    >
-                      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="Google" />
-                      {t.login}
-                    </button>
-                    
-                    {error === t.popupBlocked && (
-                      <button
-                        onClick={handleLoginRedirect}
-                        className="w-full bg-pink-100 text-pink-700 py-3 px-6 rounded-xl font-semibold text-sm hover:bg-pink-200 transition-all"
-                      >
-                        {t.tryRedirect}
-                      </button>
-                    )}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700 ml-1">{t.nameLabel}</label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder={t.namePlaceholder}
+                      className="w-full px-6 py-4 bg-white border-2 border-pink-100 rounded-2xl focus:border-pink-500 focus:ring-4 focus:ring-pink-500/10 outline-none transition-all text-lg shadow-sm"
+                    />
                   </div>
-                ) : (
-                  <div className="flex flex-col gap-4">
-                    <div className="bg-white border-2 border-pink-100 p-4 rounded-2xl flex items-center gap-4">
-                      {user.photoURL ? (
-                        <img src={user.photoURL} className="w-12 h-12 rounded-full border-2 border-pink-200" alt="Profile" />
-                      ) : (
-                        <div className="w-12 h-12 rounded-full bg-pink-100 flex items-center justify-center text-pink-500">
-                          <User size={24} />
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <p className="font-bold text-gray-900">{user.displayName}</p>
-                        <p className="text-sm text-gray-500">{user.email}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-gray-700 ml-1">{t.nameLabel}</label>
-                        <input
-                          type="text"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          placeholder={t.namePlaceholder}
-                          className="w-full px-6 py-4 bg-white border-2 border-pink-100 rounded-2xl focus:border-pink-500 focus:ring-4 focus:ring-pink-500/10 outline-none transition-all text-lg shadow-sm"
-                        />
-                      </div>
-                      <button
-                        onClick={() => name.trim() && setStep('subject')}
-                        disabled={!name.trim()}
-                        className="w-full bg-gradient-to-r from-pink-600 to-pink-500 text-white py-4 px-8 rounded-2xl font-bold text-lg shadow-lg shadow-pink-200 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
-                      >
-                        {t.next}
-                        <ChevronRight size={20} />
-                      </button>
-                      
-                      <button
-                        onClick={handleLogout}
-                        className="w-full text-gray-500 font-medium py-2 hover:text-pink-500 transition-colors text-center"
-                      >
-                        {t.logout}
-                      </button>
-                    </div>
-                  </div>
-                )}
+                  <button
+                    onClick={() => name.trim() && setStep('subject')}
+                    disabled={!name.trim()}
+                    className="w-full bg-gradient-to-r from-pink-600 to-pink-500 text-white py-4 px-8 rounded-2xl font-bold text-lg shadow-lg shadow-pink-200 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
+                  >
+                    {t.next}
+                    <ChevronRight size={20} />
+                  </button>
+                </div>
               </div>
             </div>
           </StepWrapper>
