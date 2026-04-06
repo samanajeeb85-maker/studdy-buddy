@@ -319,25 +319,46 @@ export default function App() {
     setError(null);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+      
+      if (!apiKey) {
+        throw new Error("GEMINI_API_KEY is missing. Please set it in your environment variables.");
+      }
+      
+      console.log("API Key detected:", apiKey.substring(0, 4) + "..." + apiKey.substring(apiKey.length - 4));
+
+      const ai = new GoogleGenAI({ apiKey });
       const model = "gemini-3-flash-preview";
       
-      const imageParts = photos.map(photo => {
-        const base64Data = photo.split(',')[1];
+      console.log("Starting AI generation with", photos.length, "photos...");
+
+      const imageParts = photos.map((photo, index) => {
+        const parts = photo.split(',');
+        if (parts.length < 2) {
+          console.warn(`Photo at index ${index} has invalid format.`);
+          return null;
+        }
+        const base64Data = parts[1];
+        const mimeType = parts[0].split(':')[1].split(';')[0] || "image/jpeg";
+        
         return {
           inlineData: {
             data: base64Data,
-            mimeType: "image/jpeg"
+            mimeType
           }
         };
-      });
+      }).filter(Boolean);
       
+      if (imageParts.length === 0) {
+        throw new Error("No valid images to process.");
+      }
+
       const response = await ai.models.generateContent({
         model,
         contents: [
           {
             parts: [
-              { text: `You are an expert tutor. I am providing ${photos.length} images of study material for the subject: ${subject}. 
+              { text: `You are an expert tutor. I am providing ${imageParts.length} images of study material for the subject: ${subject}. 
               
               Please follow these instructions carefully:
               1. Synthesize information from ALL provided images to create a comprehensive study guide.
@@ -348,7 +369,7 @@ export default function App() {
               6. Generate exactly 10 multiple-choice questions for an exam. Each question must have 4 options, one correct answer, and a detailed explanation of why that answer is correct based on the notes.
               7. Ensure the questions vary in difficulty and cover different topics found in the images.
               8. Return the result strictly in the specified JSON format.` },
-              ...imageParts
+              ...imageParts as any
             ]
           }
         ],
@@ -359,12 +380,18 @@ export default function App() {
         }
       });
 
-      const data = JSON.parse(response.text || '{}') as StudyData;
+      if (!response.text) {
+        throw new Error("The AI returned an empty response.");
+      }
+
+      console.log("AI generation successful!");
+      const data = JSON.parse(response.text) as StudyData;
       setStudyData(data);
       setStep('dashboard');
-    } catch (err) {
+    } catch (err: any) {
       console.error("AI Generation error:", err);
-      setError("Failed to generate study materials. Please try again.");
+      const errorMessage = err.message || "Failed to generate study materials. Please try again.";
+      setError(errorMessage);
       setStep('photo');
     }
   };
