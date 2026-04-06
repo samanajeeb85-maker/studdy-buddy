@@ -322,10 +322,8 @@ export default function App() {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
       
       if (!apiKey) {
-        throw new Error("GEMINI_API_KEY is missing. Please set it in your environment variables.");
+        throw new Error("GEMINI_API_KEY is missing. Please set it in your environment variables via the Settings menu.");
       }
-      
-      console.log("API Key detected:", apiKey.substring(0, 4) + "..." + apiKey.substring(apiKey.length - 4));
 
       const ai = new GoogleGenAI({ apiKey });
       const model = "gemini-3-flash-preview";
