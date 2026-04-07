@@ -55,12 +55,26 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Global Logger
+  app.use((req, res, next) => {
+    console.log(`[Server Request] ${new Date().toISOString()} - ${req.method} ${req.url}`);
+    next();
+  });
+
   app.use(cors());
   app.use(express.json({ limit: "50mb" }));
 
-  // API Routes - BEFORE static files and logger
-  app.post("/api/v1/generate", async (req, res) => {
-    console.log("[Server] POST /api/v1/generate");
+  // Explicit OPTIONS handler for API
+  app.options("/api-v2/*all", cors());
+
+  // DEBUG: Test routes
+  app.get("/api-v2/test", (req, res) => {
+    res.json({ message: "API v2 is reachable" });
+  });
+
+  // API Routes - ABSOLUTE TOP
+  app.post("/api-v2/generate", async (req, res) => {
+    console.log("[Server] POST /api-v2/generate");
     const { subject, photos, lang } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
 
@@ -125,8 +139,8 @@ async function startServer() {
     }
   });
 
-  app.post("/api/v1/explain-mistakes", async (req, res) => {
-    console.log("[Server] POST /api/v1/explain-mistakes");
+  app.post("/api-v2/explain-mistakes", async (req, res) => {
+    console.log("[Server] POST /api-v2/explain-mistakes");
     const { studyData, mistakes, userAnswers, lang } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
 
@@ -156,19 +170,13 @@ async function startServer() {
     }
   });
 
-  // Request logger
-  app.use((req, res, next) => {
-    console.log(`[Server] ${new Date().toISOString()} - ${req.method} ${req.url}`);
-    next();
-  });
-
   // Health check
-  app.get("/api/health", (req, res) => {
+  app.get("/api-v2/health", (req, res) => {
     res.json({ status: "ok", env: process.env.NODE_ENV });
   });
 
   // Explicit 405 handler for API routes
-  app.use("/api/v1/*all", (req, res) => {
+  app.use("/api-v2/*all", (req, res) => {
     console.warn(`[Server] 405 Method Not Allowed: ${req.method} ${req.url}`);
     res.status(405).json({ 
       error: "Method Not Allowed", 

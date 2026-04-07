@@ -134,12 +134,28 @@ const Header = ({ name, lang, onReset }: { name: string, lang: Language, onReset
       </div>
       <h1 className="text-2xl font-bold text-pink-600 tracking-tight">StudyBuddy</h1>
     </button>
-    {name && (
-      <div className={cn("flex items-center gap-2 bg-pink-50 px-3 py-1.5 rounded-full border border-pink-100", lang === 'ar' ? "flex-row-reverse" : "flex-row")}>
-        <User size={16} className="text-pink-500" />
-        <span className="text-sm font-medium text-pink-700">{name}</span>
-      </div>
-    )}
+    <div className="flex items-center gap-4">
+      <button 
+        onClick={async () => {
+          try {
+            const res = await fetch('/api-v2/test');
+            const data = await res.json();
+            alert(`API Status: ${data.message}`);
+          } catch (e) {
+            alert(`API Error: ${e}`);
+          }
+        }}
+        className="text-[10px] text-gray-400 hover:text-pink-500 transition-colors font-bold uppercase tracking-widest"
+      >
+        Check API
+      </button>
+      {name && (
+        <div className={cn("flex items-center gap-2 bg-pink-50 px-3 py-1.5 rounded-full border border-pink-100", lang === 'ar' ? "flex-row-reverse" : "flex-row")}>
+          <User size={16} className="text-pink-500" />
+          <span className="text-sm font-medium text-pink-700">{name}</span>
+        </div>
+      )}
+    </div>
   </header>
 );
 
@@ -272,7 +288,7 @@ export default function App() {
 
     setIsExplaining(true);
     try {
-      const response = await fetch('/api/v1/explain-mistakes', {
+      const response = await fetch('/api-v2/explain-mistakes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ studyData, mistakes, userAnswers, lang })
@@ -318,7 +334,7 @@ export default function App() {
     try {
       console.log("Starting AI generation with", photos.length, "photos...");
 
-      const response = await fetch('/api/v1/generate', {
+      const response = await fetch('/api-v2/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject, photos, lang })
