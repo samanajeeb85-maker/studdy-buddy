@@ -56,18 +56,27 @@ async function startServer() {
 
   app.use(express.json({ limit: "50mb" }));
 
+  // Health check
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", env: process.env.NODE_ENV });
+  });
+
   // API Routes
   app.post("/api/generate", async (req, res) => {
+    console.log("[Server] Received request for /api/generate");
     const { subject, photos, lang } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
+      console.error("[Server] GEMINI_API_KEY is missing");
       return res.status(500).json({ error: "GEMINI_API_KEY is not configured on the server." });
     }
 
     try {
       const ai = new GoogleGenAI({ apiKey });
-      const model = "gemini-3-flash-preview";
+      const model = "gemini-1.5-flash";
+
+      console.log(`[Server] Generating content for subject: ${subject} with ${photos.length} photos`);
 
       const imageParts = photos.map((photo: string) => {
         const parts = photo.split(',');
@@ -105,15 +114,15 @@ async function startServer() {
         config: {
           responseMimeType: "application/json",
           responseSchema: StudyDataSchema as any,
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
         }
       });
 
-      if (!response.text) {
+      const text = response.text;
+      if (!text) {
         throw new Error("AI returned empty response");
       }
 
-      const data = JSON.parse(response.text);
+      const data = JSON.parse(text);
       res.json(data);
     } catch (error: any) {
       console.error("AI Generation error:", error);
@@ -141,13 +150,9 @@ async function startServer() {
       Please respond in ${lang === 'ar' ? 'Arabic' : 'English'}.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
-        }
+        model: "gemini-1.5-flash",
+        contents: prompt
       });
-
       res.json({ text: response.text || "Could not generate explanation." });
     } catch (error: any) {
       console.error("AI Explanation error:", error);

@@ -279,8 +279,14 @@ export default function App() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to explain mistakes.");
+        const errorText = await response.text();
+        console.error("[App] Server error response:", errorText);
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.error || `Failed to explain mistakes (Status: ${response.status})`);
+        } catch (e) {
+          throw new Error(`Server error (${response.status}): ${errorText.substring(0, 100)}`);
+        }
       }
 
       const data = await response.json();
@@ -319,8 +325,14 @@ export default function App() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate study materials.");
+        const errorText = await response.text();
+        console.error("[App] Server error response:", errorText);
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.error || `Failed to generate study materials (Status: ${response.status})`);
+        } catch (e) {
+          throw new Error(`Server error (${response.status}): ${errorText.substring(0, 100)}`);
+        }
       }
 
       console.log("AI generation successful!");
