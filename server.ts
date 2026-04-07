@@ -58,24 +58,9 @@ async function startServer() {
   app.use(cors());
   app.use(express.json({ limit: "50mb" }));
 
-  // Request logger
-  app.use((req, res, next) => {
-    console.log(`[Server] ${new Date().toISOString()} - ${req.method} ${req.url}`);
-    next();
-  });
-
-  // Health check
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", env: process.env.NODE_ENV });
-  });
-
-  // API Routes
-  app.get("/api-v1/generate", (req, res) => {
-    res.json({ message: "API endpoint exists. Use POST to generate study materials." });
-  });
-
-  app.post("/api-v1/generate", async (req, res) => {
-    console.log("[Server] Received request for /api-v1/generate");
+  // API Routes - BEFORE static files and logger
+  app.post("/api/v1/generate", async (req, res) => {
+    console.log("[Server] POST /api/v1/generate");
     const { subject, photos, lang } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
 
@@ -87,8 +72,6 @@ async function startServer() {
     try {
       const ai = new GoogleGenAI({ apiKey });
       const model = "gemini-1.5-flash";
-
-      console.log(`[Server] Generating content for subject: ${subject} with ${photos.length} photos`);
 
       const imageParts = photos.map((photo: string) => {
         const parts = photo.split(',');
@@ -142,8 +125,8 @@ async function startServer() {
     }
   });
 
-  app.post("/api-v1/explain-mistakes", async (req, res) => {
-    console.log("[Server] Received request for /api-v1/explain-mistakes");
+  app.post("/api/v1/explain-mistakes", async (req, res) => {
+    console.log("[Server] POST /api/v1/explain-mistakes");
     const { studyData, mistakes, userAnswers, lang } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
 
@@ -173,8 +156,19 @@ async function startServer() {
     }
   });
 
+  // Request logger
+  app.use((req, res, next) => {
+    console.log(`[Server] ${new Date().toISOString()} - ${req.method} ${req.url}`);
+    next();
+  });
+
+  // Health check
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", env: process.env.NODE_ENV });
+  });
+
   // Explicit 405 handler for API routes
-  app.use("/api-v1/*all", (req, res) => {
+  app.use("/api/v1/*all", (req, res) => {
     console.warn(`[Server] 405 Method Not Allowed: ${req.method} ${req.url}`);
     res.status(405).json({ 
       error: "Method Not Allowed", 
