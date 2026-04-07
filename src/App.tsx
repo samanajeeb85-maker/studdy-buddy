@@ -24,12 +24,9 @@ import {
   Lightbulb,
   HelpCircle
 } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
 import { cn } from './lib/utils';
-import { StudyData, StudyDataSchema } from './types';
+import { StudyData } from './types';
 import ReactMarkdown from 'react-markdown';
-
-import { ThinkingLevel } from "@google/genai";
 
 const MAX_PHOTOS = 20;
 const OWNER_EMAIL = 'samanajeeb85@gmail.com';
@@ -275,28 +272,22 @@ export default function App() {
 
     setIsExplaining(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const prompt = `Based on the following study material and the mistakes I made in the exam, please provide a friendly and encouraging explanation of why these answers were wrong and what the correct concepts are.
-      
-      Study Material: ${studyData.comprehensiveExplanation}
-      
-      Mistakes:
-      ${mistakes.map(m => `Question: ${m.question}\nMy Answer: ${userAnswers[studyData.exam.indexOf(m)]}\nCorrect Answer: ${m.correctAnswer}\nExplanation: ${m.explanation}`).join('\n\n')}
-      
-      Please respond in ${lang === 'ar' ? 'Arabic' : 'English'}.`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
-        }
+      const response = await fetch('/api/explain-mistakes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studyData, mistakes, userAnswers, lang })
       });
 
-      setMistakeExplanation(response.text || "Could not generate explanation.");
-    } catch (err) {
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to explain mistakes.");
+      }
+
+      const data = await response.json();
+      setMistakeExplanation(data.text || "Could not generate explanation.");
+    } catch (err: any) {
       console.error(err);
-      setError("Failed to explain mistakes.");
+      setError(err.message || "Failed to explain mistakes.");
     } finally {
       setIsExplaining(false);
     }
@@ -319,71 +310,21 @@ export default function App() {
     setError(null);
 
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-      
-      if (!apiKey) {
-        throw new Error("GEMINI_API_KEY is missing. Please set it in your environment variables via the Settings menu.");
-      }
-
-      const ai = new GoogleGenAI({ apiKey });
-      const model = "gemini-3-flash-preview";
-      
       console.log("Starting AI generation with", photos.length, "photos...");
 
-      const imageParts = photos.map((photo, index) => {
-        const parts = photo.split(',');
-        if (parts.length < 2) {
-          console.warn(`Photo at index ${index} has invalid format.`);
-          return null;
-        }
-        const base64Data = parts[1];
-        const mimeType = parts[0].split(':')[1].split(';')[0] || "image/jpeg";
-        
-        return {
-          inlineData: {
-            data: base64Data,
-            mimeType
-          }
-        };
-      }).filter(Boolean);
-      
-      if (imageParts.length === 0) {
-        throw new Error("No valid images to process.");
-      }
-
-      const response = await ai.models.generateContent({
-        model,
-        contents: [
-          {
-            parts: [
-              { text: `You are an expert tutor. I am providing ${imageParts.length} images of study material for the subject: ${subject}. 
-              
-              Please follow these instructions carefully:
-              1. Synthesize information from ALL provided images to create a comprehensive study guide.
-              2. Generate the response in the following language: ${lang === 'ar' ? 'Arabic' : 'English'}.
-              3. Generate a 'comprehensiveExplanation' which is a detailed, structured explanation of all the materials. Use Markdown for formatting (headings, lists, bold text).
-              4. Generate a 'simpleExplanation' which is a simplified version of the same content, using very easy-to-understand language, analogies, and shorter sentences to make the subject easier to grasp.
-              5. Generate exactly 10 high-quality flashcards that cover the most important concepts across all images.
-              6. Generate exactly 10 multiple-choice questions for an exam. Each question must have 4 options, one correct answer, and a detailed explanation of why that answer is correct based on the notes.
-              7. Ensure the questions vary in difficulty and cover different topics found in the images.
-              8. Return the result strictly in the specified JSON format.` },
-              ...imageParts as any
-            ]
-          }
-        ],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: StudyDataSchema as any,
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
-        }
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject, photos, lang })
       });
 
-      if (!response.text) {
-        throw new Error("The AI returned an empty response.");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate study materials.");
       }
 
       console.log("AI generation successful!");
-      const data = JSON.parse(response.text) as StudyData;
+      const data = await response.json() as StudyData;
       setStudyData(data);
       setStep('dashboard');
     } catch (err: any) {
