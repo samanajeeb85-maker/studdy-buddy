@@ -3,6 +3,7 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
+import cors from "cors";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,7 +55,14 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  app.use(cors());
   app.use(express.json({ limit: "50mb" }));
+
+  // Request logger
+  app.use((req, res, next) => {
+    console.log(`[Server] ${new Date().toISOString()} - ${req.method} ${req.url}`);
+    next();
+  });
 
   // Health check
   app.get("/api/health", (req, res) => {
@@ -62,8 +70,12 @@ async function startServer() {
   });
 
   // API Routes
-  app.post("/api/generate", async (req, res) => {
-    console.log("[Server] Received request for /api/generate");
+  app.get("/api-v1/generate", (req, res) => {
+    res.json({ message: "API endpoint exists. Use POST to generate study materials." });
+  });
+
+  app.post("/api-v1/generate", async (req, res) => {
+    console.log("[Server] Received request for /api-v1/generate");
     const { subject, photos, lang } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
 
@@ -130,7 +142,8 @@ async function startServer() {
     }
   });
 
-  app.post("/api/explain-mistakes", async (req, res) => {
+  app.post("/api-v1/explain-mistakes", async (req, res) => {
+    console.log("[Server] Received request for /api-v1/explain-mistakes");
     const { studyData, mistakes, userAnswers, lang } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
 
@@ -158,6 +171,15 @@ async function startServer() {
       console.error("AI Explanation error:", error);
       res.status(500).json({ error: error.message || "Failed to explain mistakes." });
     }
+  });
+
+  // Explicit 405 handler for API routes
+  app.use("/api-v1/*all", (req, res) => {
+    console.warn(`[Server] 405 Method Not Allowed: ${req.method} ${req.url}`);
+    res.status(405).json({ 
+      error: "Method Not Allowed", 
+      message: `The ${req.method} method is not supported for this endpoint.` 
+    });
   });
 
   // Vite middleware for development

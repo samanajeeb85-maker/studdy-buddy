@@ -272,7 +272,7 @@ export default function App() {
 
     setIsExplaining(true);
     try {
-      const response = await fetch('/api/explain-mistakes', {
+      const response = await fetch('/api-v1/explain-mistakes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ studyData, mistakes, userAnswers, lang })
@@ -318,7 +318,7 @@ export default function App() {
     try {
       console.log("Starting AI generation with", photos.length, "photos...");
 
-      const response = await fetch('/api/generate', {
+      const response = await fetch('/api-v1/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject, photos, lang })
